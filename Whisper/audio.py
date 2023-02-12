@@ -112,7 +112,7 @@ def log_mel_spectrogram(audio: Union[str, np.ndarray, torch.Tensor], n_mels: int
       A Tensor that contains the Mel spectrogram
   """
   if not torch.is_tensor(audio):
-    if isinstance(audio, str):
+    if isinstance(audio, str): 
       audio = load_audio(audio)
     audio = torch.from_numpy(audio)
 
