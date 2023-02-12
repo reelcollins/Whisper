@@ -65,3 +65,40 @@ def pad_or_trim(array, length: int = N_SAMPLES, *, axis: int = -1):
       pad_widths = [(0, 0)] * array.ndim
       pad_widths[axis] = (0, length - array.shape[axis])
       array = F.pad(array, [pad for sizes in pad_widths[::-1] for pad in sizes])
+  
+  else:
+    if array.shape[axis] > length:
+      array = array.take(indices=range(length), axis=axis)
+
+    if array.shape[axis] < length:
+      pad_widths = [(0, 0)] * array.ndim
+      pad_widths[axis] = (0, length - array.shape[axis])
+      array = np.pad(array, pad_widths)
+
+  return array
+
+
+@lru_cache(maxsize=None)
+def mel_filters(device, n_mels: int = N_MELS) -> torch.Tensor:
+  """
+  load the mel filterbank matrix for projecting STFT into a Mel spectrogram.
+  Allows decoupling librosa dependency; saved using:
+
+    np.savez_compressed(
+        "mel_filters.npx",
+        mel_80=librosa.filters.mel(sr=16000, n_fft=400, n_mels=80),
+    )
+  """
+  assert n_mels == 80, f"Unsupported n_mels: {n_mels}"
+  with np.load(os.path.join(os.path.dirname(__file__), "assets", "mel_filters.npz")) as f:
+    return torch.from_numpy(f[f"mel_{n_mels}"]).to(device)
+
+
+def log_mel_spectrogram(audio: Union[str, np.ndarray, torch.Tensor], n_mels: int = N_MELS):
+  """
+  compute the log-Mel spectrogram of
+  
+  Parameters
+  ----------
+  audio: Union[str, np.ndarray, torch.Tensor], shape = (*)
+      The path to audio or eitherr a """
