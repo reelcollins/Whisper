@@ -101,4 +101,29 @@ def log_mel_spectrogram(audio: Union[str, np.ndarray, torch.Tensor], n_mels: int
   Parameters
   ----------
   audio: Union[str, np.ndarray, torch.Tensor], shape = (*)
-      The path to audio or eitherr a """
+      The path to audio or either a Numpy or Tensor containing the audio waveform in 16kHz
+      
+  n_mels: int
+      The number of Mel-Frequency filters, only 80 is supported
+      
+  Returns
+  -------
+  torch.Tensor, shape = (80, n_frames)
+      A Tensor that contains the Mel spectrogram
+  """
+  if not torch.is_tensor(audio):
+    if isinstance(audio, str):
+      audio = load_audio(audio)
+    audio = torch.from_numpy(audio)
+
+  window = torch.hann_window(N_FFT).to(audio.device)
+  stft = torch.stft(audio, N_FFT, HOP_LENGTH, window=window, return_complex=True)
+  magnitudes = stft[..., :-1].abs() ** 2
+
+  filters = mel_filters(audio.device, n_mels)
+  mel_spec = filters @ magnitudes
+
+  log_spec = torch.clamp(mel_spec, min=1e-10).log10()
+  log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+  log_spec = (log_spec + 4.0) / 4.0
+  return log_spec
