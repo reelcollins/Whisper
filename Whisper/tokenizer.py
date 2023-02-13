@@ -253,3 +253,63 @@ class Tokenizer:
         tokens = self.tokenizer.encode(text)
         assert len(tokens) == 1, f"{text} is not encoded as a single token"
         return tokens[0]
+
+@lru_cache(maxsize=None)
+def build_tokenizer(name: str = "gpt2"):
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    path = os.path.join(os.path.dirname(__file__), "assets", name)
+    tokenizer = GPT2TokenizerFast.from_pretrained(path)
+
+    specials = [
+        "<|startoftranscript|>",
+        *[f"<|{lang}|>" for lang in LANGUAGES.keys()],
+        "<|translate|>",
+        "<|transcribe|>",
+        "<|startoflm|>",
+        "<|startofprev|>",
+        "<|nospeech|>",
+        "<|notimestamps|>",
+    ]
+
+    tokenizer.add_special_tokens(dict(additional_special_tokens=specials))
+    return tokenizer
+
+
+@lru_cache(maxsize=None)
+def get_tokenizer(
+    multilingual: bool,
+    *,
+    task: Optional[str] = None,  # Literal["transcribe", "translate", None]
+    language: Optional[str] = None,
+) -> Tokenizer:
+    if language is not None:
+        language = language.lower()
+        if language not in LANGUAGES:
+            if language in TO_LANGUAGE_CODE:
+                language = TO_LANGUAGE_CODE[language]
+            else:
+                raise ValueError(f"Unsupported language: {language}")
+
+    if multilingual:
+        tokenizer_name = "multilingual"
+        task = task or "transcribe"
+        language = language or "en"
+    else:
+        tokenizer_name = "gpt2"
+        task = None
+        language = None
+
+    tokenizer = build_tokenizer(name=tokenizer_name)
+    all_special_ids: List[int] = tokenizer.all_special_ids
+    sot: int = all_special_ids[1]
+    translate: int = all_special_ids[-6]
+    transcribe: int = all_special_ids[-5]
+
+    langs = tuple(LANGUAGES.keys())
+    sot_sequence = [sot]
+    if language is not None:
+        sot_sequence.append(sot + 1 + langs.index(language))
+    if task is not None:
+        sot_sequence.append(transcribe if task == "transcribe" else translate)
+
+    return Tokenizer(tokenizer=tokenizer, language=language, sot_sequence=tuple(sot_sequence))
